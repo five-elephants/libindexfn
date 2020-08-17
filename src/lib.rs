@@ -1,9 +1,17 @@
 mod error;
+mod names;
 mod storage;
+mod lookup;
+mod index;
+mod indexer;
 
 pub use error::*;
-pub use storage::{AccessStorage,ObjectName};
+pub use names::*;
+pub use storage::AccessStorage;
 pub use storage::fs::FileStorage;
+pub use lookup::Lookup;
+pub use index::Index;
+pub use indexer::hashtable_indexer::HashTableIndexer;
 
 #[cfg(test)]
 mod tests {
