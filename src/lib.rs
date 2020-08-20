@@ -18,7 +18,14 @@ mod tests {
     use serde::{Serialize,Deserialize};
     use temp_testdir::TempDir;
     use tokio_test::block_on;
-    use crate::{AccessStorage,ObjectName};
+    use crate::{
+        AccessStorage,
+        ObjectName,
+        ObjectNameBuf,
+        HashTableIndexer,
+        Index,
+        Lookup
+    };
     use crate::storage::fs::FileStorage;
 
     #[test]
@@ -76,6 +83,72 @@ mod tests {
 
             let rd_obj: Box<TestData> = sto.read_json(foo).await.unwrap();
             assert_eq!(test_object, *rd_obj);
+        });
+    }
+
+    #[derive(Debug,Deserialize,Serialize,PartialEq)]
+    struct TestIndexData {
+        number: i32
+    }
+
+    async fn index_by_name(_: &FileStorage, name: ObjectNameBuf) -> String {
+        name.name().name().to_string()
+    }
+
+    async fn index_by_number(sto: &FileStorage, name: ObjectNameBuf) -> i32 {
+        let res: Result<Box<TestIndexData>,_> = sto.read_json(name.name()).await;
+
+        if let Ok(content) = res {
+            content.number
+        } else {
+            -1
+        }
+    }
+
+    #[test]
+    fn test_indexer() {
+        const FILENAMES: [&str; 4] = [
+            "foo", "bar", "baz", "blub"
+        ];
+        const CONTENT: [i32; 4] = [
+            1, 2, 3, 4
+        ];
+
+        let dir = TempDir::default();
+        let sto = FileStorage::new(dir.as_ref());
+
+        block_on(async {
+            // prep directory
+            for (filename, content) in FILENAMES.iter().zip(CONTENT.iter()) {
+                let name = ObjectName::new(filename).unwrap();
+                let obj = TestIndexData {
+                    number: *content
+                };
+
+                sto.write_json(name, &obj).await.unwrap();
+            }
+
+            // create index
+            let name_index = HashTableIndexer::index(&sto,
+                                                     ObjectName::empty(),
+                                                     index_by_name)
+                .await.unwrap();
+
+            let number_index = HashTableIndexer::index(&sto,
+                                                       ObjectName::empty(),
+                                                       index_by_number)
+                .await.unwrap();
+
+            // test index
+            for filename in FILENAMES.iter() {
+                let lkup = name_index.get(&filename.to_string()).unwrap();
+                assert_eq!(vec![ObjectName::new(filename).unwrap()], lkup);
+            }
+
+            for (content,filename) in CONTENT.iter().zip(FILENAMES.iter()) {
+                let lkup = number_index.get(content).unwrap();
+                assert_eq!(vec![ObjectName::new(filename).unwrap()], lkup);
+            }
         });
     }
 }

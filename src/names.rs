@@ -1,6 +1,6 @@
 use crate::{IdxResult,IdxError};
 
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,Debug,PartialEq)]
 pub struct ObjectName<'a> {
     name: &'a str
 }
@@ -39,3 +39,30 @@ impl<'a> ObjectName<'a> {
 }
 
 
+
+pub struct ObjectNameBuf {
+    name: String
+}
+
+impl ObjectNameBuf {
+    pub fn new() -> Self {
+        Self {
+            name: String::new()
+        }
+    }
+
+    pub fn from_str(name: impl AsRef<str>) -> IdxResult<Self> {
+        let ptr = ObjectName::new(name.as_ref())?;
+        let s = ptr.name().to_string();
+
+        Ok(Self {
+            name: s
+        })
+    }
+
+    pub fn name<'a>(&'a self) -> ObjectName<'a> {
+        ObjectName {
+            name: &self.name
+        }
+    }
+}

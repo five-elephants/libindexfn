@@ -1,6 +1,7 @@
-use crate::{IdxResult,ObjectName,AccessStorage,Lookup};
+use crate::{IdxResult,ObjectName,ObjectNameBuf,AccessStorage,Lookup};
 
 use async_trait::async_trait;
+use std::future::Future;
 
 /// Trait to index storage systems.
 ///
@@ -14,10 +15,12 @@ pub trait Index<'a> {
     type Lookup: Lookup<'a, Key = Self::Key>;
 
     /// Constructor to perform indexing asynchronously
-    async fn index<S,F>(storage: &S, start: ObjectName<'_>, keymap: F)
+    async fn index<'b, S,F,U>(storage: &'b S, start: ObjectName<'_>, keymap: F)
             -> IdxResult<Self::Lookup>
         where
             S: AccessStorage + Sync,
-            F: Fn(&S, ObjectName<'_>) -> Self::Key + Send;
+            //F: Fn(&S, ObjectName<'_>) -> Self::Key + Send;
+            U: Future<Output = Self::Key> + Send,
+            F: Fn(&'b S, ObjectNameBuf) -> U + Send + Sync;
 }
 
