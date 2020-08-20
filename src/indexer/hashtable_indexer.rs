@@ -1,7 +1,7 @@
 use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,AccessStorage};
 
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::{hash_map,HashMap};
 use std::hash::Hash;
 use std::future::Future;
 
@@ -11,7 +11,7 @@ pub struct HashTableIndexer<K> {
 
 
 #[async_trait]
-impl<'a, K: Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
+impl<'a, K: 'a + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
     type Key = K;
     type Lookup = Self;
 
@@ -27,9 +27,8 @@ impl<'a, K: Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
 
         for file in listing {
             let filename = ObjectNameBuf::from_str(&file)?;
-            let key = keymap(storage, filename).await;
+            let key = keymap(storage, filename.clone()).await;
 
-            let filename = ObjectNameBuf::from_str(&file)?;
             map.entry(key).or_insert(vec![]).push(filename);
         }
 
@@ -42,8 +41,9 @@ impl<'a, K: Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
 }
 
 
-impl<'a, K: Eq + Hash> Lookup<'a> for HashTableIndexer<K> {
+impl<'a, K: 'a + Eq + Hash> Lookup<'a> for HashTableIndexer<K> {
     type Key = K;
+    type KeyIter = hash_map::Keys<'a, Self::Key, Vec<ObjectNameBuf>>;
 
     fn get(&'a self, key: &Self::Key) -> IdxResult<Vec<ObjectName<'a>>> {
         if let Some(res) = self.map.get(key) {
@@ -59,11 +59,8 @@ impl<'a, K: Eq + Hash> Lookup<'a> for HashTableIndexer<K> {
         }
     }
 
-    fn filter<F,T>(&self, _fltr: F) -> T
-        where
-            F: Fn(&Self::Key) -> bool,
-            T: Lookup<'a>
-    {
-        unimplemented!()
+
+    fn keys(&'a self) -> Self::KeyIter {
+        self.map.keys()
     }
 }

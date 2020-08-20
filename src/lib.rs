@@ -91,11 +91,15 @@ mod tests {
         number: i32
     }
 
-    async fn index_by_name(_: &FileStorage, name: ObjectNameBuf) -> String {
+    async fn index_by_name<S: AccessStorage + Sync>(_: &S, name: ObjectNameBuf) -> String {
         name.name().name().to_string()
     }
 
-    async fn index_by_number(sto: &FileStorage, name: ObjectNameBuf) -> i32 {
+    async fn index_by_name_length<S: AccessStorage + Sync>(_: &S, name: ObjectNameBuf) -> usize {
+        name.name().name().len()
+    }
+
+    async fn index_by_number<S: AccessStorage + Sync>(sto: &S, name: ObjectNameBuf) -> i32 {
         let res: Result<Box<TestIndexData>,_> = sto.read_json(name.name()).await;
 
         if let Ok(content) = res {
@@ -134,6 +138,11 @@ mod tests {
                                                      index_by_name)
                 .await.unwrap();
 
+            let name_len_index = HashTableIndexer::index(&sto,
+                                                         ObjectName::empty(),
+                                                         index_by_name_length)
+                .await.unwrap();
+
             let number_index = HashTableIndexer::index(&sto,
                                                        ObjectName::empty(),
                                                        index_by_number)
@@ -145,10 +154,26 @@ mod tests {
                 assert_eq!(vec![ObjectName::new(filename).unwrap()], lkup);
             }
 
+            let lkup = name_len_index.get(&3).unwrap();
+            let expected = vec![ObjectName::new("foo").unwrap(),
+                                ObjectName::new("bar").unwrap(),
+                                ObjectName::new("baz").unwrap()];
+
+            assert!(lkup.contains(&expected[0]));
+            assert!(lkup.contains(&expected[1]));
+            assert!(lkup.contains(&expected[2]));
+
             for (content,filename) in CONTENT.iter().zip(FILENAMES.iter()) {
                 let lkup = number_index.get(content).unwrap();
                 assert_eq!(vec![ObjectName::new(filename).unwrap()], lkup);
             }
+
+
+            // test iterator access
+            let lengths: Vec<_> = name_len_index.keys().collect();
+            assert!(lengths.contains(&&3));
+            assert!(lengths.contains(&&4));
+            assert_eq!(2, lengths.len());
         });
     }
 }

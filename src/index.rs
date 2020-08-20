@@ -11,7 +11,7 @@ use std::future::Future;
 #[async_trait]
 pub trait Index<'a> {
     /// The type that is extracted from every object to create the index
-    type Key;
+    type Key: 'a;
     type Lookup: Lookup<'a, Key = Self::Key>;
 
     /// Constructor to perform indexing asynchronously
@@ -19,7 +19,6 @@ pub trait Index<'a> {
             -> IdxResult<Self::Lookup>
         where
             S: AccessStorage + Sync,
-            //F: Fn(&S, ObjectName<'_>) -> Self::Key + Send;
             U: Future<Output = Self::Key> + Send,
             F: Fn(&'b S, ObjectNameBuf) -> U + Send + Sync;
 }
