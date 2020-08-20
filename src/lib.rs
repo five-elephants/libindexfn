@@ -91,16 +91,16 @@ mod tests {
         number: i32
     }
 
-    async fn index_by_name<S: AccessStorage + Sync>(_: &S, name: ObjectNameBuf) -> String {
-        name.name().name().to_string()
+    async fn index_by_name<S: AccessStorage + Sync>(_: &S, name_buf: ObjectNameBuf) -> String {
+        name_buf.name().as_str().to_string()
     }
 
-    async fn index_by_name_length<S: AccessStorage + Sync>(_: &S, name: ObjectNameBuf) -> usize {
-        name.name().name().len()
+    async fn index_by_name_length<S: AccessStorage + Sync>(_: &S, name_buf: ObjectNameBuf) -> usize {
+        name_buf.name().as_str().len()
     }
 
-    async fn index_by_number<S: AccessStorage + Sync>(sto: &S, name: ObjectNameBuf) -> i32 {
-        let res: Result<Box<TestIndexData>,_> = sto.read_json(name.name()).await;
+    async fn index_by_number<S: AccessStorage + Sync>(sto: &S, name_buf: ObjectNameBuf) -> i32 {
+        let res: Result<Box<TestIndexData>,_> = sto.read_json(name_buf.name()).await;
 
         if let Ok(content) = res {
             content.number

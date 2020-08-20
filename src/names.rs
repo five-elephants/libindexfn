@@ -33,7 +33,7 @@ impl<'a> ObjectName<'a> {
             })
     }
 
-    pub fn name(&'a self) -> &'a str {
+    pub fn as_str(&'a self) -> &'a str {
         self.name
     }
 }
@@ -53,7 +53,7 @@ impl ObjectNameBuf {
 
     pub fn from_str(name: impl AsRef<str>) -> IdxResult<Self> {
         let ptr = ObjectName::new(name.as_ref())?;
-        let s = ptr.name().to_string();
+        let s = ptr.as_str().to_string();
 
         Ok(Self {
             name: s

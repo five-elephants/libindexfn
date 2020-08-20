@@ -19,7 +19,7 @@ impl FileStorage {
 
     fn make_path(&self, obj: ObjectName<'_>) -> PathBuf {
         let mut p = self.base_path.clone();
-        p.push(Path::new(obj.name()));
+        p.push(Path::new(obj.as_str()));
         p
     }
 }
@@ -34,7 +34,7 @@ impl AccessStorage for FileStorage {
     {
         let path = self.make_path(dir_name);
 
-        //println!("list({:?} in {:?})", dir_name.name(), self.base_path);
+        //println!("list({:?} in {:?})", dir_name.as_str(), self.base_path);
         let mut dir = fs::read_dir(path).await?;
         let mut rv = vec![];
         while let Some(entry) = dir.next_entry().await? {
