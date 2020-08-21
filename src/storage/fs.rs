@@ -5,6 +5,7 @@ use std::path::{Path,PathBuf};
 use async_trait::async_trait;
 use tokio::fs;
 
+#[derive(Clone)]
 pub struct FileStorage {
     base_path: PathBuf,
 }

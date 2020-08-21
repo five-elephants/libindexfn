@@ -15,11 +15,11 @@ pub trait Index<'a> {
     type Lookup: Lookup<'a, Key = Self::Key>;
 
     /// Constructor to perform indexing asynchronously
-    async fn index<'b, S,F,U>(storage: &'b S, start: ObjectName<'_>, keymap: F)
+    async fn index<S,F,U>(storage: &S, start: ObjectName<'_>, keymap: F)
             -> IdxResult<Self::Lookup>
         where
-            S: AccessStorage + Sync,
+            S: AccessStorage + Sync + Send + Clone + 'static,
             U: Future<Output = Self::Key> + Send,
-            F: Fn(&'b S, ObjectNameBuf) -> U + Send + Sync;
+            F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static;
 }
 

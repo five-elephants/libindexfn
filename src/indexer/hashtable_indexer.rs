@@ -1,9 +1,13 @@
 use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,AccessStorage};
 
+use tokio::spawn;
 use async_trait::async_trait;
+use futures::future::join_all;
 use std::collections::{hash_map,HashMap};
 use std::hash::Hash;
 use std::future::Future;
+use std::sync::mpsc;
+
 
 pub struct HashTableIndexer<K> {
     map: HashMap<K,Vec<ObjectNameBuf>>
@@ -11,24 +15,49 @@ pub struct HashTableIndexer<K> {
 
 
 #[async_trait]
-impl<'a, K: 'a + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
+impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
     type Key = K;
     type Lookup = Self;
 
-    async fn index<'b, S,F,U>(storage: &'b S, start: ObjectName<'_>, keymap: F)
+    async fn index<S,F,U>(storage: &S, start: ObjectName<'_>, keymap: F)
             -> IdxResult<Self::Lookup>
         where
-            S: AccessStorage + Sync,
+            S: AccessStorage + Clone + Send + Sync + 'static,
             U: Future<Output = Self::Key> + Send,
-            F: Fn(&'b S, ObjectNameBuf) -> U + Send + Sync
+            F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static
     {
+        // Set up a channel to return computed keys from indexing tasks
+        let (tx, rx) = mpsc::channel();
+        // Vec for task JoinHandles
+        let mut index_tasks = Vec::new();
+
+        // List files in storage and start a task for each one
+        for file in storage.list(start).await?.into_iter() {
+            let f = ObjectNameBuf::from_str(&file)?;
+
+            let handle = {
+                // clone everything to pass to the async block inside the task
+                // data in the task has to have 'static lifetime
+                let tx = tx.clone();
+                let storage = storage.clone();
+                let keymap: F = keymap.clone();
+
+                spawn(async move {
+                    let key = keymap(storage, f.clone()).await;
+                    tx.send((key, f)).unwrap();
+                })
+            };
+            index_tasks.push(handle);
+        }
+
+        // wait for all tasks to complete
+        let num_tasks = index_tasks.len();
+        join_all(index_tasks).await;
+
+        // collect results from channel into index HashMap
         let mut map = HashMap::new();
-        let listing: Vec<_> = storage.list(start).await?.into_iter().collect();
-
-        for file in listing {
-            let filename = ObjectNameBuf::from_str(&file)?;
-            let key = keymap(storage, filename.clone()).await;
-
+        for _ in 0..num_tasks {
+            let (key, filename) = rx.recv().unwrap();
             map.entry(key).or_insert(vec![]).push(filename);
         }
 
