@@ -1,12 +1,11 @@
 use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,AccessStorage};
 
 use tokio::spawn;
+use tokio::sync::mpsc;
 use async_trait::async_trait;
-use futures::future::join_all;
 use std::collections::{hash_map,HashMap};
 use std::hash::Hash;
 use std::future::Future;
-use std::sync::mpsc;
 
 
 pub struct HashTableIndexer<K> {
@@ -27,7 +26,7 @@ impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
             F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static
     {
         // Set up a channel to return computed keys from indexing tasks
-        let (tx, rx) = mpsc::channel();
+        let (tx, mut rx) = mpsc::channel(100);
         // Vec for task JoinHandles
         let mut index_tasks = Vec::new();
 
@@ -38,26 +37,26 @@ impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
             let handle = {
                 // clone everything to pass to the async block inside the task
                 // data in the task has to have 'static lifetime
-                let tx = tx.clone();
+                let mut tx = tx.clone();
                 let storage = storage.clone();
                 let keymap: F = keymap.clone();
 
                 spawn(async move {
                     let key = keymap(storage, f.clone()).await;
-                    tx.send((key, f)).unwrap();
+                    if let Err(_) = tx.send((key, f)).await {
+                        panic!("Unexpected error: receiver dropped");
+                    }
                 })
             };
             index_tasks.push(handle);
         }
 
-        // wait for all tasks to complete
-        let num_tasks = index_tasks.len();
-        join_all(index_tasks).await;
+        // need to drop receiver threads/tasks Sender, so that while loop below can terminate 
+        drop(tx);
 
         // collect results from channel into index HashMap
         let mut map = HashMap::new();
-        for _ in 0..num_tasks {
-            let (key, filename) = rx.recv().unwrap();
+        while let Some((key, filename)) = rx.recv().await {
             map.entry(key).or_insert(vec![]).push(filename);
         }
 

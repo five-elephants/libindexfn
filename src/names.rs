@@ -39,7 +39,7 @@ impl<'a> ObjectName<'a> {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct ObjectNameBuf {
     name: String
 }
