@@ -1,5 +1,7 @@
 use crate::{IdxResult,IdxError};
 
+use serde::{Serialize,Deserialize};
+
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub struct ObjectName<'a> {
     name: &'a str
@@ -39,7 +41,7 @@ impl<'a> ObjectName<'a> {
 }
 
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct ObjectNameBuf {
     name: String
 }

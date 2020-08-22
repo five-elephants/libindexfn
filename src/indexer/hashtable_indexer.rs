@@ -3,12 +3,14 @@ use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,AccessStorage};
 use tokio::spawn;
 use tokio::sync::mpsc;
 use async_trait::async_trait;
+use serde::{Serialize,Deserialize};
 use std::collections::{hash_map,HashMap};
 use std::hash::Hash;
 use std::future::Future;
 
 
-pub struct HashTableIndexer<K> {
+#[derive(Serialize,Deserialize)]
+pub struct HashTableIndexer<K: Eq + Hash> {
     map: HashMap<K,Vec<ObjectNameBuf>>
 }
 
