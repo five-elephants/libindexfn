@@ -41,10 +41,10 @@ impl AccessStorage for FileStorage {
         while let Some(entry) = dir.next_entry().await? {
             let entry_path = entry.path();
             let entry_rel_path = entry_path.strip_prefix(&self.base_path)
-                .map_err(|_| IdxError::StorageError)?;
+                .map_err(IdxError::storage_error)?;
 
             let s = entry_rel_path.to_str()
-                .ok_or(IdxError::StorageError)?
+                .ok_or(IdxError::storage_error_msg("Can't convert filesystem path to unicode string"))?
                 .to_string();
             rv.push(s);
         }

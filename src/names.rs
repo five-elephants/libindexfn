@@ -14,7 +14,7 @@ impl<'a> ObjectName<'a> {
                 name: name
             })
         } else {
-            Err(IdxError::StorageError)
+            Err(IdxError::storage_error_msg(format!("The name given is not a valid object name: '{}'", name)))
         }
     }
 
