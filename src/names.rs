@@ -71,3 +71,21 @@ impl ObjectNameBuf {
         }
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_valid_names() {
+        assert!(ObjectName::new("hello_world").is_ok());
+        assert!(ObjectName::new("2020-05-06_22:00+0200_Linsen_mit_Saiten").is_ok());
+        assert!(ObjectName::new("äöüß").is_ok());
+        assert!(ObjectName::new("space is ok").is_ok());
+
+        assert!(ObjectName::new("/").is_err());
+        assert!(ObjectName::new("\\").is_err());
+        assert!(ObjectName::new("\n").is_err());
+    }
+}
