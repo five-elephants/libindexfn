@@ -32,6 +32,8 @@ impl fmt::Display for IdxError {
     }
 }
 
+impl Error for IdxError { }
+
 pub type IdxResult<T> = Result<T, IdxError>;
 
 
