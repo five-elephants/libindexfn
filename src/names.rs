@@ -27,10 +27,13 @@ impl<'a> ObjectName<'a> {
     fn is_valid_object_name(name: &str) -> bool {
         name.chars()
             .all(|c| {
-                char::is_alphanumeric(c)
-                    || (c == '_')
-                    || (c == '-')
-                    || (c == '.')
+                (c != '/') &&
+                (c != '\\') &&
+                !char::is_control(c)
+                // char::is_alphanumeric(c)
+                //     || (c == '_')
+                //     || (c == '-')
+                //     || (c == '.')
 
             })
     }
