@@ -10,7 +10,7 @@ pub use names::*;
 pub use storage::AccessStorage;
 pub use storage::fs::FileStorage;
 pub use lookup::Lookup;
-pub use index::Index;
+pub use index::{Index,MultiIndex};
 pub use indexer::hashtable_indexer::HashTableIndexer;
 
 #[cfg(test)]
@@ -24,6 +24,7 @@ mod tests {
         ObjectNameBuf,
         HashTableIndexer,
         Index,
+        MultiIndex,
         Lookup
     };
     use crate::storage::fs::FileStorage;
@@ -109,6 +110,17 @@ mod tests {
         }
     }
 
+    async fn multi_index_by_letter<S: AccessStorage + Sync>(_: S, name_buf: ObjectNameBuf) -> Vec<char> {
+        let s = name_buf.name().as_str().to_string();
+        let mut rv = Vec::with_capacity(s.len());
+
+        for c in s.chars() {
+            rv.push(c);
+        }
+
+        rv
+    }
+
     #[test]
     fn test_indexer() {
         const FILENAMES: [&str; 4] = [
@@ -174,6 +186,43 @@ mod tests {
             assert!(lengths.contains(&&3));
             assert!(lengths.contains(&&4));
             assert_eq!(2, lengths.len());
+        });
+    }
+
+    #[test]
+    fn test_multi_indexer() {
+        const FILENAMES: [&str; 4] = [
+            "foo", "bar", "baz", "blub"
+        ];
+        const CONTENT: [i32; 4] = [
+            1, 2, 3, 4
+        ];
+
+        let dir = TempDir::default();
+        let sto = FileStorage::new(dir.as_ref());
+
+        block_on(async {
+            // prep directory
+            for (filename, content) in FILENAMES.iter().zip(CONTENT.iter()) {
+                let name = ObjectName::new(filename).unwrap();
+                let obj = TestIndexData {
+                    number: *content
+                };
+
+                sto.write_json(name, &obj).await.unwrap();
+            }
+
+            // create index
+            let letter_index = HashTableIndexer::multi_index(&sto,
+                                                             ObjectName::empty(),
+                                                             multi_index_by_letter)
+                .await.unwrap();
+
+            // test index
+            let lkup = letter_index.get(&'a').unwrap();
+            assert_eq!(2, lkup.len());
+            assert!(lkup.contains(&ObjectName::new("bar").unwrap()));
+            assert!(lkup.contains(&ObjectName::new("baz").unwrap()));
         });
     }
 }

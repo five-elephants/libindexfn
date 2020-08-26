@@ -1,4 +1,4 @@
-use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,AccessStorage};
+use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,MultiIndex,AccessStorage};
 
 use tokio::spawn;
 use tokio::sync::mpsc;
@@ -60,6 +60,65 @@ impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
         let mut map = HashMap::new();
         while let Some((key, filename)) = rx.recv().await {
             map.entry(key).or_insert(vec![]).push(filename);
+        }
+
+        let rv = Self {
+            map: map
+        };
+
+        Ok(rv)
+    }
+}
+
+
+#[async_trait]
+impl<'a, K: 'static + Eq + Hash + Send> MultiIndex<'a> for HashTableIndexer<K> {
+    type Key = K;
+    type Lookup = Self;
+
+    async fn multi_index<S,F,U>(storage: &S, start: ObjectName<'_>, keymap: F)
+            -> IdxResult<Self::Lookup>
+        where
+            S: AccessStorage + Clone + Send + Sync + 'static,
+            U: Future<Output = Vec<Self::Key>> + Send,
+            F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static
+    {
+        // Set up a channel to return computed keys from indexing tasks
+        let (tx, mut rx) = mpsc::channel(100);
+        // Vec for task JoinHandles
+        let mut index_tasks = Vec::new();
+
+        // List files in storage and start a task for each one
+        for file in storage.list(start).await?.into_iter() {
+            let f = ObjectNameBuf::from_str(&file)?;
+
+            let handle = {
+                // clone everything to pass to the async block inside the task
+                // data in the task has to have 'static lifetime
+                let mut tx = tx.clone();
+                let storage = storage.clone();
+                let keymap: F = keymap.clone();
+
+                spawn(async move {
+                    let keys = keymap(storage, f.clone()).await;
+                    if let Err(_) = tx.send((keys, f)).await {
+                        panic!("Unexpected error: receiver dropped");
+                    }
+                })
+            };
+            index_tasks.push(handle);
+        }
+
+        // need to drop receiver threads/tasks Sender, so that while loop below can terminate 
+        drop(tx);
+
+        // collect results from channel into index HashMap
+        let mut map = HashMap::new();
+        while let Some((keys, filename)) = rx.recv().await {
+            for key in keys {
+                let filename_cpy = filename.clone();
+                map.entry(key).or_insert(vec![]).push(filename_cpy);
+            }
         }
 
         let rv = Self {

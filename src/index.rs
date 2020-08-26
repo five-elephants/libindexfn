@@ -23,3 +23,19 @@ pub trait Index<'a> {
             F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static;
 }
 
+
+/// Trait to index storage like Index, but produce multiple keys for each object
+#[async_trait]
+pub trait MultiIndex<'a> {
+    /// The type that is extracted from every object to create the index
+    type Key: 'a;
+    type Lookup: Lookup<'a, Key = Self::Key>;
+
+    /// Constructor to perform indexing asynchronously
+    async fn multi_index<S,F,U>(storage: &S, start: ObjectName<'_>, keymap: F)
+            -> IdxResult<Self::Lookup>
+        where
+            S: AccessStorage + Sync + Send + Clone + 'static,
+            U: Future<Output = Vec<Self::Key>> + Send,
+            F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static;
+}
