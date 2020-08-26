@@ -4,7 +4,8 @@ use std::fmt;
 #[derive(Debug)]
 pub enum IdxError {
     StorageError(Box<dyn Error>),
-    JsonError(serde_json::error::Error)
+    JsonError(serde_json::error::Error),
+    IndexingError(IndexingError),
 }
 
 impl IdxError {
@@ -27,6 +28,10 @@ impl fmt::Display for IdxError {
 
             Self::JsonError(err) => {
                 write!(f, "JSON error: {}", err)
+            }
+
+            Self::IndexingError(err) => {
+                write!(f, "Indexing error: {}", err)
             }
         }
     }
@@ -51,6 +56,13 @@ impl From<tokio::io::Error> for IdxError {
 }
 
 
+impl From<IndexingError> for IdxError {
+    fn from(e: IndexingError) -> Self {
+        IdxError::IndexingError(e)
+    }
+}
+
+
 
 #[derive(Debug)]
 pub struct Message(pub String);
@@ -62,3 +74,27 @@ impl fmt::Display for Message {
 }
 
 impl Error for Message { }
+
+
+#[derive(Debug)]
+pub struct IndexingError {
+    message: String
+}
+
+impl IndexingError {
+    pub fn new(msg: impl Into<String>) -> Self {
+        Self {
+            message: msg.into()
+        }
+    }
+}
+
+impl fmt::Display for IndexingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl Error for IndexingError {}
+
+pub type IndexingResult<T> = Result<T, IndexingError>;

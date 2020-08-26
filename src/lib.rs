@@ -25,7 +25,9 @@ mod tests {
         HashTableIndexer,
         Index,
         MultiIndex,
-        Lookup
+        Lookup,
+        IndexingError,
+        IndexingResult,
     };
     use crate::storage::fs::FileStorage;
 
@@ -92,25 +94,34 @@ mod tests {
         number: i32
     }
 
-    async fn index_by_name<S: AccessStorage + Sync>(_: S, name_buf: ObjectNameBuf) -> String {
-        name_buf.name().as_str().to_string()
+    async fn index_by_name<S: AccessStorage + Sync>(_: S, name_buf: ObjectNameBuf) -> IndexingResult<String> {
+        Ok(name_buf.name().as_str().to_string())
     }
 
-    async fn index_by_name_length<S: AccessStorage + Sync>(_: S, name_buf: ObjectNameBuf) -> usize {
-        name_buf.name().as_str().len()
+    async fn index_by_name_length<S: AccessStorage + Sync>(
+        _: S,
+        name_buf: ObjectNameBuf
+    ) -> IndexingResult<usize> {
+        Ok(name_buf.name().as_str().len())
     }
 
-    async fn index_by_number<S: AccessStorage + Sync>(sto: S, name_buf: ObjectNameBuf) -> i32 {
+    async fn index_by_number<S: AccessStorage + Sync>(
+        sto: S,
+        name_buf: ObjectNameBuf
+    ) -> IndexingResult<i32> {
         let res: Result<Box<TestIndexData>,_> = sto.read_json(name_buf.name()).await;
 
         if let Ok(content) = res {
-            content.number
+            Ok(content.number)
         } else {
-            -1
+            Err(IndexingError::new(format!("Failed to read '{}' as JSON object", name_buf.name().as_str())))
         }
     }
 
-    async fn multi_index_by_letter<S: AccessStorage + Sync>(_: S, name_buf: ObjectNameBuf) -> Vec<char> {
+    async fn multi_index_by_letter<S: AccessStorage + Sync>(
+        _: S,
+        name_buf: ObjectNameBuf
+    ) -> IndexingResult<Vec<char>> {
         let s = name_buf.name().as_str().to_string();
         let mut rv = Vec::with_capacity(s.len());
 
@@ -118,7 +129,7 @@ mod tests {
             rv.push(c);
         }
 
-        rv
+        Ok(rv)
     }
 
     #[test]

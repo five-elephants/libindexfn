@@ -1,4 +1,13 @@
-use crate::{IdxResult,ObjectName,ObjectNameBuf,Lookup,Index,MultiIndex,AccessStorage};
+use crate::{
+    IdxResult,
+    IndexingError,
+    ObjectName,
+    ObjectNameBuf,
+    Lookup,
+    Index,
+    MultiIndex,
+    AccessStorage
+};
 
 use tokio::spawn;
 use tokio::sync::mpsc;
@@ -19,12 +28,13 @@ pub struct HashTableIndexer<K: Eq + Hash> {
 impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
     type Key = K;
     type Lookup = Self;
+    type Error = IndexingError;
 
     async fn index<S,F,U>(storage: &S, start: ObjectName<'_>, keymap: F)
             -> IdxResult<Self::Lookup>
         where
             S: AccessStorage + Clone + Send + Sync + 'static,
-            U: Future<Output = Self::Key> + Send,
+            U: Future<Output = Result<Self::Key, Self::Error>> + Send,
             F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static
     {
         // Set up a channel to return computed keys from indexing tasks
@@ -59,7 +69,7 @@ impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
         // collect results from channel into index HashMap
         let mut map = HashMap::new();
         while let Some((key, filename)) = rx.recv().await {
-            map.entry(key).or_insert(vec![]).push(filename);
+            map.entry(key?).or_insert(vec![]).push(filename);
         }
 
         let rv = Self {
@@ -75,12 +85,13 @@ impl<'a, K: 'static + Eq + Hash + Send> Index<'a> for HashTableIndexer<K> {
 impl<'a, K: 'static + Eq + Hash + Send> MultiIndex<'a> for HashTableIndexer<K> {
     type Key = K;
     type Lookup = Self;
+    type Error = IndexingError;
 
     async fn multi_index<S,F,U>(storage: &S, start: ObjectName<'_>, keymap: F)
             -> IdxResult<Self::Lookup>
         where
             S: AccessStorage + Clone + Send + Sync + 'static,
-            U: Future<Output = Vec<Self::Key>> + Send,
+            U: Future<Output = Result<Vec<Self::Key>, Self::Error>> + Send,
             F: Fn(S, ObjectNameBuf) -> U + Send + Sync + Clone + 'static
     {
         // Set up a channel to return computed keys from indexing tasks
@@ -115,7 +126,7 @@ impl<'a, K: 'static + Eq + Hash + Send> MultiIndex<'a> for HashTableIndexer<K> {
         // collect results from channel into index HashMap
         let mut map = HashMap::new();
         while let Some((keys, filename)) = rx.recv().await {
-            for key in keys {
+            for key in keys? {
                 let filename_cpy = filename.clone();
                 map.entry(key).or_insert(vec![]).push(filename_cpy);
             }
