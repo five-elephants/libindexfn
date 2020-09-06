@@ -2,6 +2,7 @@ mod error;
 mod names;
 mod storage;
 mod lookup;
+mod scored_lookup;
 mod index;
 mod indexer;
 
@@ -10,6 +11,7 @@ pub use names::*;
 pub use storage::AccessStorage;
 pub use storage::fs::FileStorage;
 pub use lookup::Lookup;
+pub use scored_lookup::find_best_match;
 pub use index::{Index,MultiIndex};
 pub use indexer::hashtable_indexer::HashTableIndexer;
 
@@ -28,6 +30,7 @@ mod tests {
         Lookup,
         IndexingError,
         IndexingResult,
+        find_best_match,
     };
     use crate::storage::fs::FileStorage;
 
@@ -234,6 +237,55 @@ mod tests {
             assert_eq!(2, lkup.len());
             assert!(lkup.contains(&ObjectName::new("bar").unwrap()));
             assert!(lkup.contains(&ObjectName::new("baz").unwrap()));
+        });
+    }
+
+    fn score_number(query: &i32, key: &i32) -> f64 {
+        1.0 - ((*key as f64) - (*query as f64)).abs()
+    }
+
+
+    #[test]
+    fn test_scored_lookup() {
+        const FILENAMES: [&str; 4] = [
+            "foo", "bar", "baz", "blub"
+        ];
+        const CONTENT: [i32; 4] = [
+            10, 20, 30, 40
+        ];
+
+        let dir = TempDir::default();
+        let sto = FileStorage::new(dir.as_ref());
+
+        block_on(async {
+            // prep directory
+            for (filename, content) in FILENAMES.iter().zip(CONTENT.iter()) {
+                let name = ObjectName::new(filename).unwrap();
+                let obj = TestIndexData {
+                    number: *content
+                };
+
+                sto.write_json(name, &obj).await.unwrap();
+            }
+
+            // create index
+            let number_index = HashTableIndexer::index(&sto,
+                                                       ObjectName::empty(),
+                                                       index_by_number)
+                .await.unwrap();
+
+            // test index
+            let hits = find_best_match(
+                &number_index,
+                score_number,
+                18
+            ).unwrap();
+
+            let hit_items: Vec<_> = hits.iter()
+                .map(|x| x.item().as_str())
+                .collect();
+
+            assert_eq!(vec!["bar", "foo", "baz", "blub"], hit_items);
         });
     }
 }

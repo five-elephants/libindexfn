@@ -14,5 +14,3 @@ pub trait Lookup<'a> {
     /// Iterate over keys in index in arbitrary order
     fn keys(&'a self) -> Self::KeyIter;
 }
-
-

@@ -17,6 +17,11 @@ impl IdxError {
         let msg = Message(s.into());
         Self::storage_error(msg)
     }
+
+    pub fn indexing_error_msg(s: impl Into<String>) -> Self {
+        let err = IndexingError::new(s);
+        Self::IndexingError(err)
+    }
 }
 
 impl fmt::Display for IdxError {
