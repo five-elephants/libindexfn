@@ -278,7 +278,7 @@ mod tests {
             let hits = find_best_match(
                 &number_index,
                 score_number,
-                18
+                &18
             ).unwrap();
 
             let hit_items: Vec<_> = hits.iter()

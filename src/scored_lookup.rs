@@ -46,7 +46,7 @@ impl<T> Eq for ScoredHit<T> { }
 pub fn find_best_match<'a, L,F,Q,K>(
     lookup: &'a L,
     score: F,
-    query: Q
+    query: &Q
 ) -> IdxResult<Vec<ScoredHit<ObjectName<'a>>>> 
     where
         L: Lookup<'a>,
@@ -60,7 +60,7 @@ pub fn find_best_match<'a, L,F,Q,K>(
     // compute score for all keys
     for key in lookup.keys() {
         let k: K = key.into();
-        let s = score(&query, k);
+        let s = score(query, k);
         if s.is_nan() {
             let msg = format!("Score evaluates to NaN for key '{:?}' and query '{:?}'",
                 key, query);
